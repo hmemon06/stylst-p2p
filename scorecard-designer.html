@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STYLST Scorecard Designer</title>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,700;0,900;1,400;1,700&display=swap" rel="stylesheet">
+<style>
+  @font-face {
+    font-family: 'Satoshi';
+    src: url('./assets/fonts/Satoshi-Variable.ttf') format('truetype');
+    font-weight: 100 900;
+    font-style: normal;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: #080808; color: #fff; font-family: 'Satoshi', -apple-system, 'SF Pro Display', system-ui, sans-serif; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useCallback, useEffect } = React;
+
+function getScoreColor(score) {
+  return score > 80 ? '#34C759' : score > 50 ? '#FFCC00' : '#FF3B30';
+}
+
+function getEmoji(key, score) {
+  const map = {
+    aura:    score > 80 ? '🔥' : score > 50 ? '✨' : '💀',
+    fit:     score > 80 ? '👔' : score > 50 ? '👕' : '🩳',
+    palette: score > 80 ? '🎨' : score > 50 ? '🌈' : '🖤',
+    trend:   score > 80 ? '📈' : score > 50 ? '📊' : '📉',
+  };
+  return map[key] || '⭐';
+}
+
+const CARD_W = 390;
+const CARD_H = 693;
+
+function ScorecardDesigner() {
+  const [image, setImage] = useState(null);
+  const [score, setScore] = useState(86);
+  const [potential, setPotential] = useState(94);
+  const [vibe, setVibe] = useState('MAFIA VIBE');
+  const [aura, setAura] = useState(92);
+  const [fit, setFit] = useState(84);
+  const [palette, setPalette] = useState(80);
+  const [trend, setTrend] = useState(82);
+  const [showStamp, setShowStamp] = useState(true);
+  const [showPotential, setShowPotential] = useState(true);
+  const [stampX, setStampX] = useState(16);
+  const [stampY, setStampY] = useState(50);
+  const [stampRotate, setStampRotate] = useState(-12);
+  const [stampScale, setStampScale] = useState(100);
+
+  // Image position & zoom
+  const [imageX, setImageX] = useState(0);
+  const [imageY, setImageY] = useState(0);
+  const [imageZoom, setImageZoom] = useState(100);
+
+  // Vignette controls
+  const [topVigOpacity, setTopVigOpacity] = useState(60);
+  const [topVigHeight, setTopVigHeight] = useState(35);
+  const [botVigOpacity, setBotVigOpacity] = useState(85);
+  const [botVigHeight, setBotVigHeight] = useState(55);
+
+  // Global scale
+  const [globalScale, setGlobalScale] = useState(100);
+
+  // Diagnosis (one good thing + critique)
+  const [showDiagnosis, setShowDiagnosis] = useState(true);
+  const [compliment, setCompliment] = useState('Your layering game is actually clean.');
+  const [critique, setCritique] = useState('The proportions need some work.');
+  const [showCompliment, setShowCompliment] = useState(true);
+  const [showCritique, setShowCritique] = useState(true);
+
+  const cardRef = useRef(null);
+  const dragging = useRef(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+
+  // Image drag refs
+  const imgDragging = useRef(false);
+  const imgDragOffset = useRef({ x: 0, y: 0 });
+
+  useEffect(() => {
+    const onMouseMove = (e) => {
+      if (!cardRef.current) return;
+      if (dragging.current) {
+        const rect = cardRef.current.getBoundingClientRect();
+        setStampX(Math.round(e.clientX - rect.left - dragOffset.current.x));
+        setStampY(Math.round(e.clientY - rect.top - dragOffset.current.y));
+      } else if (imgDragging.current) {
+        setImageX(prev => prev + e.movementX);
+        setImageY(prev => prev + e.movementY);
+      }
+    };
+    const onMouseUp = () => {
+      dragging.current = false;
+      imgDragging.current = false;
+    };
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+    };
+  }, []);
+
+  const handleStampMouseDown = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragging.current = true;
+    const rect = cardRef.current.getBoundingClientRect();
+    dragOffset.current = {
+      x: e.clientX - rect.left - stampX,
+      y: e.clientY - rect.top - stampY,
+    };
+  };
+
+  const handleImageMouseDown = (e) => {
+    // Only start image drag if not clicking on stamp or other interactive elements
+    if (e.target.closest('[data-stamp]')) return;
+    e.preventDefault();
+    imgDragging.current = true;
+  };
+
+  const themeColor = getScoreColor(score);
+  const sc = globalScale / 100;
+
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setImage(ev.target.result);
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleExport = useCallback(async () => {
+    const el = cardRef.current;
+    if (!el) return;
+    try {
+      const canvas = await window.html2canvas(el, {
+        scale: 3,
+        backgroundColor: null,
+        useCORS: true,
+      });
+      const link = document.createElement('a');
+      link.download = `stylst-scorecard-${score}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch (err) {
+      console.error('Export failed:', err);
+      alert('Export failed. Check console.');
+    }
+  }, [score]);
+
+  const vibes = ['MAFIA VIBE', 'OLD MONEY', 'CLEAN MINIMAL', 'STREET READY', 'DATE NIGHT', 'SHARP & CRISP'];
+
+  const diagnosisVisible = showDiagnosis && (
+    (showCompliment && compliment.trim()) ||
+    (showCritique && critique.trim())
+  );
+
+  return (
+    <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
+      <div style={{ maxWidth: 920, margin: '0 auto' }}>
+        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: -0.3, marginBottom: 4 }}>
+          STYLST Scorecard Designer
+        </h1>
+        <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 12, marginBottom: 28 }}>
+          Create pixel-perfect score cards for mockups. Upload an image, adjust scores, export as PNG.
+        </p>
+
+        <div style={{ display: 'flex', gap: 32, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+
+          {/* === THE CARD === */}
+          <div
+            ref={cardRef}
+            onMouseDown={handleImageMouseDown}
+            style={{
+              width: CARD_W, height: CARD_H, borderRadius: 0, overflow: 'hidden',
+              position: 'relative', flexShrink: 0, background: '#111',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.06)',
+              cursor: image ? (imgDragging.current ? 'grabbing' : 'grab') : 'default',
+            }}
+          >
+            {/* Background Image */}
+            {image ? (
+              <div style={{
+                position: 'absolute',
+                top: `${imageY}px`, left: `${imageX}px`,
+                width: `${imageZoom}%`, height: `${imageZoom}%`,
+                backgroundImage: `url(${image})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                pointerEvents: 'none',
+              }} />
+            ) : (
+              <div style={{
+                position: 'absolute', top: 0, left: 0, width: '100%', height: '100%',
+                background: 'linear-gradient(170deg, #5a4e42 0%, #3d352c 25%, #2a2420 50%, #1a1612 75%, #0e0c0a 100%)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <span style={{ color: 'rgba(255,255,255,0.15)', fontSize: 14, letterSpacing: 3, fontWeight: 600 }}>
+                  UPLOAD IMAGE
+                </span>
+              </div>
+            )}
+
+            {/* Top vignette */}
+            <div style={{
+              position: 'absolute', top: 0, left: 0, width: '100%', height: `${topVigHeight}%`,
+              background: `linear-gradient(180deg, rgba(0,0,0,${topVigOpacity / 100}) 0%, transparent 100%)`,
+              zIndex: 2, pointerEvents: 'none',
+            }} />
+
+            {/* Bottom vignette */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, width: '100%', height: `${botVigHeight}%`,
+              background: `linear-gradient(0deg, rgba(0,0,0,${botVigOpacity / 100}) 0%, rgba(0,0,0,${botVigOpacity / 200}) 40%, transparent 100%)`,
+              zIndex: 2, pointerEvents: 'none',
+            }} />
+
+            {/* STYLST branding — scaled from top center */}
+            <div style={{
+              position: 'absolute', top: 20, left: 0, width: '100%',
+              display: 'flex', justifyContent: 'center', zIndex: 3,
+              transform: `scale(${sc})`,
+              transformOrigin: 'top center',
+            }}>
+              <span style={{
+                color: 'rgba(255,255,255,0.85)', fontSize: 22, fontWeight: 700,
+                letterSpacing: 2, fontFamily: "'Bodoni Moda', Georgia, serif",
+              }}>STYLST</span>
+            </div>
+
+            {/* Score stamp — stays independent of global scale (has its own size control) */}
+            {showStamp && (
+              <div
+                data-stamp
+                onMouseDown={handleStampMouseDown}
+                style={{
+                  position: 'absolute', top: stampY, left: stampX,
+                  zIndex: 4,
+                  transform: `rotate(${stampRotate}deg) scale(${stampScale / 100})`,
+                  transformOrigin: 'top left',
+                  cursor: dragging.current ? 'grabbing' : 'grab',
+                  userSelect: 'none',
+                }}>
+                <svg height="110" width="130" viewBox="0 0 100 80">
+                  <defs>
+                    <linearGradient id="stampGrad" x1="0" y1="0" x2="1" y2="1">
+                      <stop offset="0" stopColor={themeColor} stopOpacity="1" />
+                      <stop offset="1" stopColor={themeColor} stopOpacity="0.8" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    d="M5,5 L95,5 L95,75 L5,75 Z"
+                    fill="none"
+                    stroke="url(#stampGrad)"
+                    strokeWidth="3"
+                    strokeDasharray="4,2"
+                  />
+                  <text
+                    x="50" y="58"
+                    fill={themeColor}
+                    fontSize="52"
+                    fontWeight="bold"
+                    fontFamily="'Bodoni Moda', Georgia, serif"
+                    textAnchor="middle"
+                    stroke={themeColor}
+                    strokeWidth="1.5"
+                  >
+                    {score}
+                  </text>
+                </svg>
+              </div>
+            )}
+
+            {/* Bottom content — scaled from bottom center */}
+            <div style={{
+              position: 'absolute', bottom: 0, left: 0, right: 0, padding: '0 20px 20px',
+              zIndex: 3, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8,
+              transform: `scale(${sc})`,
+              transformOrigin: 'bottom center',
+            }}>
+              {/* Potential pill */}
+              {showPotential && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 6,
+                  padding: '5px 12px', borderRadius: 16,
+                  background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(255,255,255,0.15)',
+                  backdropFilter: 'blur(10px)',
+                }}>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontSize: 10, fontFamily: "'Satoshi', sans-serif", fontWeight: 700, letterSpacing: 1 }}>POTENTIAL</span>
+                  <span style={{ color: '#fff', fontSize: 12, fontFamily: "'Satoshi', sans-serif", fontWeight: 900 }}>{potential} 🚀</span>
+                </div>
+              )}
+
+              {/* Vibe label */}
+              <div style={{
+                color: 'white', fontSize: 36, fontFamily: "'Bodoni Moda', Georgia, serif",
+                fontWeight: 700, textShadow: '0 2px 4px rgba(0,0,0,0.8)',
+                textAlign: 'center', lineHeight: 1.1,
+              }}>
+                {vibe}
+              </div>
+
+              {/* Diagnosis: one good thing + critique */}
+              {diagnosisVisible && (
+                <div style={{
+                  width: '100%', background: 'rgba(0,0,0,0.45)',
+                  borderRadius: 12, border: '1px solid rgba(255,255,255,0.1)',
+                  padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8,
+                }}>
+                  {showCompliment && compliment.trim() && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>✅</span>
+                      <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: "'Satoshi', sans-serif", lineHeight: 1.45 }}>
+                        {compliment}
+                      </span>
+                    </div>
+                  )}
+                  {showCompliment && compliment.trim() && showCritique && critique.trim() && (
+                    <div style={{ height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                  )}
+                  {showCritique && critique.trim() && (
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ fontSize: 13, flexShrink: 0, marginTop: 1 }}>❌</span>
+                      <span style={{ color: 'rgba(255,255,255,0.9)', fontSize: 11, fontFamily: "'Satoshi', sans-serif", lineHeight: 1.45 }}>
+                        {critique}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Stats grid */}
+              <div style={{
+                display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%',
+              }}>
+                {[
+                  { key: 'aura', label: 'AURA', score: aura },
+                  { key: 'fit', label: 'FIT', score: fit },
+                  { key: 'palette', label: 'PALETTE', score: palette },
+                  { key: 'trend', label: 'TREND', score: trend },
+                ].map(sub => (
+                  <div key={sub.key} style={{
+                    background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: 12,
+                    border: '1px solid rgba(255,255,255,0.08)',
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  }}>
+                    <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 10, fontFamily: "'Satoshi', sans-serif", fontWeight: 700, letterSpacing: 1 }}>
+                      {sub.label}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ color: getScoreColor(sub.score), fontSize: 18, fontFamily: "'Satoshi', sans-serif", fontWeight: 900 }}>
+                        {sub.score}
+                      </span>
+                      <span style={{ fontSize: 16 }}>{getEmoji(sub.key, sub.score)}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* === CONTROLS === */}
+          <div style={{ flex: '1 1 280px', minWidth: 260 }}>
+
+            {/* Image upload */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Image</label>
+              <label style={{
+                display: 'block', padding: '12px 16px', borderRadius: 10, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)',
+                color: 'rgba(255,255,255,0.5)', fontSize: 13, textAlign: 'center',
+              }}>
+                {image ? '✓ Change Image' : 'Click to upload'}
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            {/* Image Position & Zoom */}
+            {image && (
+              <div style={{
+                marginBottom: 20, padding: 12, borderRadius: 10,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Image Position</label>
+                  <button onClick={() => { setImageX(0); setImageY(0); setImageZoom(100); }} style={{
+                    padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                    background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)',
+                    fontSize: 9, cursor: 'pointer', fontWeight: 600, letterSpacing: 0.5,
+                  }}>RESET</button>
+                </div>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginBottom: 10 }}>
+                  Drag the image on the card to reposition it
+                </p>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={sliderRowStyle}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Zoom</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="100" max="300" value={imageZoom}
+                        onChange={e => setImageZoom(Math.min(300, Math.max(100, +e.target.value || 100)))}
+                        style={numInputStyle} />
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                    </div>
+                  </div>
+                  <input type="range" min="100" max="300" value={imageZoom}
+                    onChange={e => setImageZoom(+e.target.value)} style={sliderStyle} />
+                </div>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={sliderRowStyle}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Horizontal</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="-200" max="200" value={imageX}
+                        onChange={e => setImageX(Math.min(200, Math.max(-200, +e.target.value || 0)))}
+                        style={numInputStyle} />
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>px</span>
+                    </div>
+                  </div>
+                  <input type="range" min="-200" max="200" value={imageX}
+                    onChange={e => setImageX(+e.target.value)} style={sliderStyle} />
+                </div>
+                <div>
+                  <div style={sliderRowStyle}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Vertical</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="-200" max="200" value={imageY}
+                        onChange={e => setImageY(Math.min(200, Math.max(-200, +e.target.value || 0)))}
+                        style={numInputStyle} />
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>px</span>
+                    </div>
+                  </div>
+                  <input type="range" min="-200" max="200" value={imageY}
+                    onChange={e => setImageY(+e.target.value)} style={sliderStyle} />
+                </div>
+              </div>
+            )}
+
+            {/* Vignette Controls */}
+            <div style={{
+              marginBottom: 20, padding: 12, borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Vignette</label>
+                <button onClick={() => { setTopVigOpacity(60); setTopVigHeight(35); setBotVigOpacity(85); setBotVigHeight(55); }} style={{
+                  padding: '3px 8px', borderRadius: 6, border: '1px solid rgba(255,255,255,0.1)',
+                  background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)',
+                  fontSize: 9, cursor: 'pointer', fontWeight: 600, letterSpacing: 0.5,
+                }}>RESET</button>
+              </div>
+
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>TOP</p>
+              <div style={{ marginBottom: 6 }}>
+                <div style={sliderRowStyle}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Opacity</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <input type="number" min="0" max="100" value={topVigOpacity}
+                      onChange={e => setTopVigOpacity(Math.min(100, Math.max(0, +e.target.value || 0)))}
+                      style={numInputStyle} />
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                  </div>
+                </div>
+                <input type="range" min="0" max="100" value={topVigOpacity}
+                  onChange={e => setTopVigOpacity(+e.target.value)} style={sliderStyle} />
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <div style={sliderRowStyle}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Height</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <input type="number" min="0" max="100" value={topVigHeight}
+                      onChange={e => setTopVigHeight(Math.min(100, Math.max(0, +e.target.value || 0)))}
+                      style={numInputStyle} />
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                  </div>
+                </div>
+                <input type="range" min="0" max="100" value={topVigHeight}
+                  onChange={e => setTopVigHeight(+e.target.value)} style={sliderStyle} />
+              </div>
+
+              <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', marginBottom: 12 }} />
+
+              <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 10, fontWeight: 600, letterSpacing: 1, marginBottom: 6 }}>BOTTOM</p>
+              <div style={{ marginBottom: 6 }}>
+                <div style={sliderRowStyle}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Opacity</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <input type="number" min="0" max="100" value={botVigOpacity}
+                      onChange={e => setBotVigOpacity(Math.min(100, Math.max(0, +e.target.value || 0)))}
+                      style={numInputStyle} />
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                  </div>
+                </div>
+                <input type="range" min="0" max="100" value={botVigOpacity}
+                  onChange={e => setBotVigOpacity(+e.target.value)} style={sliderStyle} />
+              </div>
+              <div>
+                <div style={sliderRowStyle}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>Height</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <input type="number" min="0" max="100" value={botVigHeight}
+                      onChange={e => setBotVigHeight(Math.min(100, Math.max(0, +e.target.value || 0)))}
+                      style={numInputStyle} />
+                    <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                  </div>
+                </div>
+                <input type="range" min="0" max="100" value={botVigHeight}
+                  onChange={e => setBotVigHeight(+e.target.value)} style={sliderStyle} />
+              </div>
+            </div>
+
+            {/* Global Scale */}
+            <div style={{
+              marginBottom: 20, padding: 12, borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={sliderRowStyle}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Global Scale</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <input type="number" min="50" max="150" value={globalScale}
+                    onChange={e => setGlobalScale(Math.min(150, Math.max(50, +e.target.value || 50)))}
+                    style={numInputStyle} />
+                  <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                </div>
+              </div>
+              <input type="range" min="50" max="150" value={globalScale}
+                onChange={e => setGlobalScale(+e.target.value)}
+                style={sliderStyle} />
+              <p style={{ color: 'rgba(255,255,255,0.25)', fontSize: 10, marginTop: 6 }}>
+                Scales logo, vibe, diagnosis, and stats grid
+              </p>
+            </div>
+
+            {/* Overall score */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={sliderRowStyle}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Overall Score</label>
+                <input type="number" min="1" max="99" value={score}
+                  onChange={e => setScore(Math.min(99, Math.max(1, +e.target.value || 1)))}
+                  style={{ ...numInputStyle, color: themeColor }} />
+              </div>
+              <input type="range" min="1" max="99" value={score}
+                onChange={e => setScore(+e.target.value)}
+                style={sliderStyle} />
+            </div>
+
+            {/* Potential */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={sliderRowStyle}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Potential</label>
+                <input type="number" min="1" max="99" value={potential}
+                  onChange={e => setPotential(Math.min(99, Math.max(1, +e.target.value || 1)))}
+                  style={numInputStyle} />
+              </div>
+              <input type="range" min="1" max="99" value={potential}
+                onChange={e => setPotential(+e.target.value)}
+                style={sliderStyle} />
+            </div>
+
+            {/* Subscores */}
+            {[
+              { label: 'Aura', val: aura, set: setAura },
+              { label: 'Fit', val: fit, set: setFit },
+              { label: 'Palette', val: palette, set: setPalette },
+              { label: 'Trend', val: trend, set: setTrend },
+            ].map(s => (
+              <div key={s.label} style={{ marginBottom: 12 }}>
+                <div style={sliderRowStyle}>
+                  <label style={{ ...labelStyle, marginBottom: 0 }}>{s.label}</label>
+                  <input type="number" min="1" max="99" value={s.val}
+                    onChange={e => s.set(Math.min(99, Math.max(1, +e.target.value || 1)))}
+                    style={{ ...numInputStyle, color: getScoreColor(s.val) }} />
+                </div>
+                <input type="range" min="1" max="99" value={s.val}
+                  onChange={e => s.set(+e.target.value)}
+                  style={sliderStyle} />
+              </div>
+            ))}
+
+            {/* Vibe selector */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={labelStyle}>Vibe Label</label>
+              <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 8 }}>
+                {vibes.map(v => (
+                  <button key={v} onClick={() => setVibe(v)} style={{
+                    padding: '6px 12px', borderRadius: 8, cursor: 'pointer', fontSize: 10,
+                    fontWeight: 600, letterSpacing: 0.5, transition: 'all 0.15s',
+                    border: vibe === v ? `1px solid ${themeColor}` : '1px solid rgba(255,255,255,0.08)',
+                    background: vibe === v ? `${themeColor}15` : 'rgba(255,255,255,0.03)',
+                    color: vibe === v ? themeColor : 'rgba(255,255,255,0.4)',
+                  }}>{v}</button>
+                ))}
+              </div>
+              <input
+                type="text" value={vibe} onChange={e => setVibe(e.target.value.toUpperCase())}
+                placeholder="Custom vibe..."
+                style={{
+                  width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 13,
+                  background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                  outline: 'none',
+                }}
+              />
+            </div>
+
+            {/* Diagnosis section */}
+            <div style={{
+              marginBottom: 20, padding: 12, borderRadius: 10,
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Diagnosis</label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.35)', fontSize: 10 }}>
+                  <input type="checkbox" checked={showDiagnosis} onChange={e => setShowDiagnosis(e.target.checked)} />
+                  Show
+                </label>
+              </div>
+
+              {/* One good thing */}
+              <div style={{ marginBottom: 10 }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>
+                  <input type="checkbox" checked={showCompliment} onChange={e => setShowCompliment(e.target.checked)} />
+                  ✅ ONE GOOD THING
+                </label>
+                <textarea
+                  value={compliment}
+                  onChange={e => setCompliment(e.target.value)}
+                  placeholder="What's working for them..."
+                  rows={2}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 12,
+                    background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                    outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4,
+                  }}
+                />
+              </div>
+
+              {/* Critique */}
+              <div>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, cursor: 'pointer', color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600, letterSpacing: 1 }}>
+                  <input type="checkbox" checked={showCritique} onChange={e => setShowCritique(e.target.checked)} />
+                  ❌ CRITIQUE
+                </label>
+                <textarea
+                  value={critique}
+                  onChange={e => setCritique(e.target.value)}
+                  placeholder="What needs work..."
+                  rows={2}
+                  style={{
+                    width: '100%', padding: '8px 12px', borderRadius: 8, fontSize: 12,
+                    background: '#1a1a1a', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+                    outline: 'none', resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4,
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Toggles */}
+            <div style={{ marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <label style={{ ...labelStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 0 }}>
+                <input type="checkbox" checked={showStamp} onChange={e => setShowStamp(e.target.checked)} />
+                Show Score Stamp
+              </label>
+              <label style={{ ...labelStyle, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 0 }}>
+                <input type="checkbox" checked={showPotential} onChange={e => setShowPotential(e.target.checked)} />
+                Show Potential Pill
+              </label>
+            </div>
+
+            {/* Stamp position controls */}
+            {showStamp && (
+              <div style={{
+                marginBottom: 20, padding: 12, borderRadius: 10,
+                background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+              }}>
+                <label style={{ ...labelStyle, marginBottom: 4 }}>Stamp Controls</label>
+                <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, marginBottom: 10 }}>
+                  Drag the stamp on the card to reposition it
+                </p>
+                <div style={{ marginBottom: 8 }}>
+                  <div style={sliderRowStyle}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Tilt</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="-45" max="45" value={stampRotate}
+                        onChange={e => setStampRotate(Math.min(45, Math.max(-45, +e.target.value || 0)))}
+                        style={numInputStyle} />
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>°</span>
+                    </div>
+                  </div>
+                  <input type="range" min="-45" max="45" value={stampRotate}
+                    onChange={e => setStampRotate(+e.target.value)} style={sliderStyle} />
+                </div>
+                <div>
+                  <div style={sliderRowStyle}>
+                    <label style={{ ...labelStyle, marginBottom: 0 }}>Size</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                      <input type="number" min="50" max="200" value={stampScale}
+                        onChange={e => setStampScale(Math.min(200, Math.max(50, +e.target.value || 50)))}
+                        style={numInputStyle} />
+                      <span style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10 }}>%</span>
+                    </div>
+                  </div>
+                  <input type="range" min="50" max="200" value={stampScale}
+                    onChange={e => setStampScale(+e.target.value)} style={sliderStyle} />
+                </div>
+              </div>
+            )}
+
+            {/* Export */}
+            <button onClick={handleExport} style={{
+              width: '100%', padding: '14px', borderRadius: 12, border: 'none',
+              background: themeColor, color: '#000', fontSize: 15, fontWeight: 700,
+              cursor: 'pointer', letterSpacing: 0.5,
+            }}>
+              Export as PNG (3x)
+            </button>
+            <p style={{ color: 'rgba(255,255,255,0.3)', fontSize: 10, textAlign: 'center', marginTop: 6 }}>
+              Exports at 3x resolution for crisp mockups
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const labelStyle = {
+  color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 600,
+  letterSpacing: 1.5, textTransform: 'uppercase', display: 'block', marginBottom: 6,
+};
+
+const sliderRowStyle = {
+  display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4,
+};
+
+const numInputStyle = {
+  width: 48, padding: '3px 6px', borderRadius: 6, fontSize: 13, fontWeight: 700,
+  background: 'rgba(255,255,255,0.06)', color: '#fff', border: '1px solid rgba(255,255,255,0.1)',
+  outline: 'none', textAlign: 'right', fontFamily: 'inherit',
+};
+
+const sliderStyle = {
+  width: '100%', accentColor: '#34C759', height: 4,
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<ScorecardDesigner />);
+</script>
+</body>
+</html>

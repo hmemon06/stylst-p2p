@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stylst AI - Your AI Style Coach</title>
+    <meta name="description" content="Rate your outfits with AI. Get personalized style feedback, glow-up redesigns, and become your most stylish self.">
+    <meta name="apple-itunes-app" content="app-id=YOUR_APP_ID">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f0f0f 0%, #1a1a2e 50%, #0f0f0f 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px 20px;
+            text-align: center;
+        }
+        .logo {
+            font-size: 3em;
+            font-weight: bold;
+            letter-spacing: 8px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #CCFF00, #00FF88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .tagline {
+            font-size: 1.5em;
+            color: #888;
+            margin-bottom: 40px;
+            max-width: 500px;
+        }
+        .features {
+            display: flex;
+            gap: 40px;
+            margin-bottom: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .feature {
+            text-align: center;
+        }
+        .feature-icon {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        .feature-text {
+            color: #aaa;
+            font-size: 0.95em;
+        }
+        .app-store-btn {
+            display: inline-block;
+            padding: 16px 40px;
+            background: #fff;
+            color: #000;
+            text-decoration: none;
+            border-radius: 30px;
+            font-weight: bold;
+            font-size: 1.1em;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-bottom: 60px;
+        }
+        .app-store-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 40px rgba(204, 255, 0, 0.3);
+        }
+        .links {
+            display: flex;
+            gap: 30px;
+            margin-top: auto;
+        }
+        .links a {
+            color: #666;
+            text-decoration: none;
+            font-size: 0.9em;
+            transition: color 0.2s;
+        }
+        .links a:hover {
+            color: #CCFF00;
+        }
+        .emoji-bg {
+            position: fixed;
+            font-size: 100px;
+            opacity: 0.03;
+            pointer-events: none;
+        }
+        .emoji-bg:nth-child(1) { top: 10%; left: 10%; }
+        .emoji-bg:nth-child(2) { top: 60%; right: 15%; }
+        .emoji-bg:nth-child(3) { bottom: 20%; left: 20%; }
+    </style>
+</head>
+<body>
+    <div class="emoji-bg">👔</div>
+    <div class="emoji-bg">✨</div>
+    <div class="emoji-bg">👗</div>
+
+    <div class="logo">STYLST</div>
+    <p class="tagline">Your AI style coach. Rate outfits, get feedback, and see your glow-up potential.</p>
+
+    <div class="features">
+        <div class="feature">
+            <div class="feature-icon">📸</div>
+            <div class="feature-text">Snap your outfit</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">🤖</div>
+            <div class="feature-text">Get AI feedback</div>
+        </div>
+        <div class="feature">
+            <div class="feature-icon">✨</div>
+            <div class="feature-text">See your glow-up</div>
+        </div>
+    </div>
+
+    <a href="https://apps.apple.com/app/stylst-ai/idYOUR_APP_ID" class="app-store-btn">
+         Download on the App Store
+    </a>
+
+    <div class="links">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+        <a href="mailto:support@stylst.app">Contact</a>
+    </div>
+</body>
+</html>
+
